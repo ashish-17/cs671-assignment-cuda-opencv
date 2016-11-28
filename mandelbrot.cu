@@ -1,8 +1,7 @@
-#include <mpi.h>
-#include "omp.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
 #define TOLERANCE 0.00001
 #define TRUE 1
@@ -12,8 +11,7 @@ long usecs();
 void initialize(double **A, int rows, int cols);
 int calc_serial(double **A, int rows, int cols, int iters, double tolerance);
 int calc_serial_v1(double **A, int rows, int cols, int iters, double tolerance);
-int calc_omp(double **A, int rows, int cols, int iters, double tolerance, int num_threads);
-int calc_gpu(double **A, int rows, int cols, int iters, double tolerance);
+int calc_gpu(double **A, int rows, int cols, int iters, double tolerance, long* time);
 double verify(double **A, double **B, int rows, int cols);
 
 __global__ void calc_gpu(int* d_arr) {
@@ -63,13 +61,12 @@ int main(int argc, char * argv[])
     startTime = usecs();
     if (choice == 0) {
         calc_serial_v1(A, rows, cols, iters, TOLERANCE);
+    	endTime = usecs();
+    	diffTime = endTime-startTime;
     } else if (choice == 1) {
-        calc_omp(A, rows, cols, iters, TOLERANCE, num_threads);
     } else if (choice == 2) {
-	calc_gpu(A, rows, cols, iters, TOLERANCE);
+	calc_gpu(A, rows, cols, iters, TOLERANCE, &diffTime);
     }
-    endTime = usecs();
-    diffTime = endTime-startTime;
 
     double err = verify(orig, A, rows, cols);
 
@@ -93,8 +90,10 @@ int main(int argc, char * argv[])
 }
 
 long usecs() {
-    double time = MPI_Wtime();
-    return (long)(time*1000000);
+	struct timespec s = {0,0};
+	clock_gettime(CLOCK_MONOTONIC, &s);
+    	double time = (s.tv_sec + s.tv_nsec*(1.0e-9))*1000000;
+    	return (long)(time);
 }
 
 void initialize(double **A, int rows, int cols) {
@@ -192,46 +191,6 @@ int calc_serial_v1(double **A, int rows, int cols, int iters, double tolerance) 
     return convergence;
 }
 
-int calc_omp(double **A, int rows, int cols, int iters, double tolerance, int num_threads) {
-    int convergence = 0;
-    double diff;
-    int i,j;
-    int for_iters;
-
-    double** B = (double**)malloc((rows+1)*sizeof(double*));
-    for (i = 0; i < rows+1; ++i) {
-        B[i] = (double*)malloc((cols+1) * sizeof(double));
-    }
-
-    for (for_iters = 0; for_iters < iters; for_iters++)
-    {
-#pragma omp parallel for private(j) num_threads(num_threads)
-        for (i = 0; i < rows+1; ++i) {
-            for (j = 0; j < cols+1; ++j) {
-                B[i][j] = A[i][j];
-            }
-        }
-
-        diff = 0.0;
-
-#pragma omp parallel for reduction(+:diff) private(j) num_threads(num_threads)
-        for (i = 1;i < rows;i++)
-        {
-            for (j = 1; j < cols; j++)
-            {
-                A[i][j] = 0.2 * (B[i][j] + B[i][j-1] + B[i-1][j] + B[i][j+1] + B[i+1][j]);
-                diff += fabs(A[i][j] - B[i][j]);
-            }
-        }
-
-        if (diff/((double)rows*(double)cols) < tolerance)
-            convergence=1;
-    } 
-
-    //printf("\nConvP = %d", convergence);
-    return convergence;
-}
-
 __global__ void calc_kernel(double* w, double* r, int rows, int cols, double tolerance) {
 	int row = blockIdx.x;	
 	int col = threadIdx.x;
@@ -241,9 +200,15 @@ __global__ void calc_kernel(double* w, double* r, int rows, int cols, double tol
 	}
 }
 
-int calc_gpu(double **A, int rows, int cols, int iters, double tolerance) {
+int calc_gpu(double **A, int rows, int cols, int iters, double tolerance, long *time) {
 	double* d_A_curr;
 	double* d_A_tmp;
+	float millisec = 0.0;
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	
+	cudaEventRecord(start);
 	cudaMalloc(&d_A_curr, (rows+1)*(cols+1)*sizeof(double));
 	cudaMalloc(&d_A_tmp, (rows+1)*(cols+1)*sizeof(double));
 	cudaMemcpy(d_A_curr, A[0], (rows+1)*(cols+1)*sizeof(double), cudaMemcpyHostToDevice);		
@@ -269,5 +234,10 @@ int calc_gpu(double **A, int rows, int cols, int iters, double tolerance) {
 	
 	cudaFree(d_A_curr);		
 	cudaFree(d_A_tmp);		
+
+	cudaEventRecord(stop);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&millisec, start, stop);
+	*time = (long)(millisec*1000);
 	return 0;
 }
