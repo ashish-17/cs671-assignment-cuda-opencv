@@ -3,8 +3,8 @@
 #include <math.h>
 #include <time.h>
 
-#define TILE_WIDTH 8
-#define TILE_HEIGHT 8
+#define TILE_WIDTH 10
+#define TILE_HEIGHT 10
 
 __host__
 __device__ int calc_mandel(float c_re, float c_im, int count)
@@ -63,12 +63,13 @@ void mandelbrotGpu(
 	
 	cudaEventRecord(start);
 	
-	cudaMalloc(&d_output, width*height*sizeof(int));
 
 	int nTilesX = (width / TILE_WIDTH) + ((width % TILE_WIDTH == 0) ? 0 : 1);
 	int nTilesY = (height / TILE_HEIGHT) + ((height % TILE_HEIGHT == 0) ? 0 : 1);
 	
-	printf("\ndim=%d,%d   %d,%d", nTilesX, nTilesY, TILE_WIDTH, TILE_HEIGHT);	
+	cudaMalloc(&d_output, width*height*sizeof(int));
+	
+	//printf("\ndim=%d,%d   %d,%d", nTilesX, nTilesY, TILE_WIDTH, TILE_HEIGHT);	
 	
 	dim3 threadsPerBlock(TILE_WIDTH, TILE_HEIGHT);
 	dim3 blocksPerGrid(nTilesX, nTilesY);
@@ -82,6 +83,6 @@ void mandelbrotGpu(
 	cudaEventRecord(stop);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&millisec, start, stop);
-	printf("\ncuda time = %f\n", millisec);
-	printf("\nVal=%d\n", mandelbrot_calc(x0, y0, x1, y1, width, height, 0, 800, maxIterations));
+	//printf("\ncuda time = %f\n", millisec);
+	//printf("\nVal=%d\n", mandelbrot_calc(x0, y0, x1, y1, width, height, 5, 517, maxIterations));
 }

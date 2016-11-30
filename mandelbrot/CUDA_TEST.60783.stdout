@@ -1,0 +1,26 @@
+============== START ==============
+e1c135
+/bin/mkdir -p objs/
+nvcc -m64 main.cpp -I../common -Iobjs/ -O3 -c -o objs/main.o
+nvcc -m64 mandelbrotSerial.cpp -I../common -Iobjs/ -O3 -c -o objs/mandelbrotSerial.o
+nvcc -m64 mandelbrotThread.cpp -I../common -Iobjs/ -O3 -c -o objs/mandelbrotThread.o
+nvcc -m64 mandelbrotGpu.cu -I../common -Iobjs/ -O3 -c -o objs/mandelbrotGpu.o
+nvcc -m64 ../common/ppm.cpp -I../common -Iobjs/ -O3 -c -o objs/ppm.o
+nvcc -m64 -I../common -Iobjs/ -O3 -o mandelbrot objs/main.o objs/mandelbrotSerial.o objs/mandelbrotThread.o objs/mandelbrotGpu.o objs/ppm.o -lm -lpthread
+[mandelbrot serial]:		[252.039] ms
+Wrote image file mandelbrot-serial.ppm
+[Thread# 0]:		[126.743] ms
+[Thread# 1]:		[126.937] ms
+[Thread# 0]:		[126.690] ms
+[Thread# 1]:		[126.786] ms
+[Thread# 0]:		[126.692] ms
+[Thread# 1]:		[126.782] ms
+[mandelbrot thread]:		[126.828] ms
+Wrote image file mandelbrot-thread.ppm
+[mandelbrot gpu]:		[1.983] ms
+Wrote image file mandelbrot-gpu.ppm
+
+				(1.99x speedup from 2 threads)
+
+				(127.10x speedup from gpu)
+=============== END ===============
