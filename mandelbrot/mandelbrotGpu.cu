@@ -3,9 +3,10 @@
 #include <math.h>
 #include <time.h>
 
-#define TILE_WIDTH 36
-#define TILE_HEIGHT 36
+#define TILE_WIDTH 8
+#define TILE_HEIGHT 8
 
+__host__
 __device__ int calc_mandel(float c_re, float c_im, int count)
 {
     float z_re = c_re, z_im = c_im;
@@ -24,6 +25,7 @@ __device__ int calc_mandel(float c_re, float c_im, int count)
     return i;
 }
 
+__host__
 __device__ int mandelbrot_calc(
     float x0, float y0, float x1, float y1,
     int width, int height,
@@ -60,14 +62,19 @@ void mandelbrotGpu(
 	cudaEventCreate(&stop);
 	
 	cudaEventRecord(start);
+	
 	cudaMalloc(&d_output, width*height*sizeof(int));
 
-	int nTilesX = width / TILE_WIDTH + (width % TILE_WIDTH == 0) ? 0 : 1;
-	int nTilesY = height / TILE_HEIGHT + (height % TILE_HEIGHT == 0) ? 0 : 1;
+	int nTilesX = (width / TILE_WIDTH) + ((width % TILE_WIDTH == 0) ? 0 : 1);
+	int nTilesY = (height / TILE_HEIGHT) + ((height % TILE_HEIGHT == 0) ? 0 : 1);
+	
+	printf("\ndim=%d,%d   %d,%d", nTilesX, nTilesY, TILE_WIDTH, TILE_HEIGHT);	
+	
 	dim3 threadsPerBlock(TILE_WIDTH, TILE_HEIGHT);
 	dim3 blocksPerGrid(nTilesX, nTilesY);
-	mandelbrot_kernel<<<blocksPerGrid, threadsPerBlock>>>(x0, y0, x1, y1, width, height, maxIterations, d_output);
 	
+	mandelbrot_kernel<<<blocksPerGrid, threadsPerBlock>>>(x0, y0, x1, y1, width, height, maxIterations, d_output);
+
 	cudaMemcpy(output, d_output, width*height*sizeof(int), cudaMemcpyDeviceToHost);		
 	
 	cudaFree(d_output);		
@@ -76,4 +83,5 @@ void mandelbrotGpu(
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&millisec, start, stop);
 	printf("\ncuda time = %f\n", millisec);
+	printf("\nVal=%d\n", mandelbrot_calc(x0, y0, x1, y1, width, height, 0, 800, maxIterations));
 }

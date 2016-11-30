@@ -6,7 +6,7 @@
 #SBATCH --reservation gpu001
 #SBATCH --gres=gpu:1
 #SBATCH -N 1
-#SBATCH -t 10:00
+#SBATCH -t 3:00
 
 sleep 3
 echo ============== START ==============
